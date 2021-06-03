@@ -2,4 +2,8 @@ The following projects are examples of data cleaning from csv's containing diffe
 
 Attached is the code used as a .txt, the cleaned and combined data frame as a .csv, and the resulting outputs as a pdf. 
 
+One point of analysis is for the Billing Department. It is clear to see that call volume and service level both are taking hits Monday - Wednesday. This would indicate calls are still coming in, but they are not being answered. This could be due to call outs, low staffing, or a strong case of the Monday (Tuesday and Wednesday) Blues. 
+
+
+Cheers :)
 
