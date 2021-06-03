@@ -1,0 +1,265 @@
+#CLEAR DIRECTORY & Import Libraries ####
+rm(list=ls())
+#setwd("C:/Users/Zach/Desktop/Bay Files")
+
+#IMPORT LIBRARIES
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(readr)
+library(purrr)
+library(data.table)
+library(stringr)
+library(lubridate)
+library(ggforce)
+
+#Clean and merge 363 .csv's into one manageable dataframe for monthly reporting####
+##      MERGE CSV IN WD AND ADD FILENAMES IN COLUMNS   
+
+
+#### READ ONE FILE AS DESIRED
+#singlefile <- read_csv("REPORTDAILY 41-1.csv", col_names=TRUE, skip=3, n_max=0)
+
+
+#### CREATE LIST OF FILES WE WILL USE
+filenames <- list.files(path = 'C:/Users/Zach/Desktop/Bay Files/Report Daily', pattern="*.csv", full.names = FALSE,recursive=TRUE) 
+
+
+
+#### READ AND MERGE ALL CSVs INTO ONE, ONLY USING DESIRED DATA
+combinedcsv <-list.files(path = "C:/Users/Zach/Desktop/Bay Files/Report Daily",
+           pattern="*.csv", 
+           full.names = T) %>% 
+  map_df(~read_csv(., skip=3, n_max=1))
+
+#### Add filename as row and separate dpt and date converters
+combinedcsv$filename <- as.factor(basename(filenames))
+combinedcsv <- combinedcsv %>%
+  separate(filename, into = c('filename', "dpt", "dayconverter", "delete"),)
+
+
+#Clean Columns
+combinedcsv$dayconverter <- as.numeric(as.character(combinedcsv$dayconverter))
+combinedcsv$pulldate <- as.Date("2021-06-01")
+combinedcsv$delete <- NULL
+combinedcsv$filename <- NULL
+combinedcsv$'Staffed Hours' <- combinedcsv$`Staffed Time`/(60*60)
+combinedcsv$`Available Hours` <- combinedcsv$'Avail Time'/(60*60)
+combinedcsv$'Avg ACD Time (Minutes)' <- combinedcsv$'Avg ACD Time'/60
+combinedcsv$`AUX Hours` <- combinedcsv$'AUX Time'/(60*60)
+combinedcsv$`Other Hours` <- combinedcsv$'Other Time'/(60*60)
+combinedcsv$Date <- (combinedcsv$pulldate) - (combinedcsv$dayconverter)
+combinedcsv$Department <- sapply(combinedcsv$dpt, switch,
+                                 '41' = 'Monitoring', 
+                                 '52' = 'Billing',
+                                 '53' = 'Service Dispatch Customer',
+                                 '54' = 'Service Dispatch Tech',
+                                 '55' = '3G Projects',
+                                 '61' = 'Field Support Customer',
+                                 '62' = 'Field Support Tech',
+                                 '63' = 'Fire Admin Customer',
+                                 '64' = 'Fire Admin Tech',
+                                 '71' = 'Tech Support Customer',
+                                 '72' = 'Tech Support Tech')
+
+
+CleanedDF <- combinedcsv[, c(25,24,18,19,20,21,22,23,16,17)]
+
+## SL And Summary Report Cleaning and Combining####
+
+SL41 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 41 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Monitoring")
+SL52 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 52 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Billing")
+SL53 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 53 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Service Dispatch Customer")
+SL54 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 54 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Service Dispatch Tech")
+SL55 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 55 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "3G Projects")
+SL61 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 61 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Field Support Customer")
+SL62 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 62 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Field Support Tech")
+SL63 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 63 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Fire Admin Customer")
+SL64 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 64 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Fire Admin Tech")
+SL71 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 71 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Tech Support Customer")
+SL72 <- read_csv("C:/Users/Zach/Desktop/Bay Files/SL/Service Level 72 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Tech Support Tech")
+
+ServiceLevel <- bind_rows(SL41,SL52,SL53,SL54,SL55,SL61,SL62,SL63,SL64,SL71,SL72)
+ServiceLevel$SLGoal <- as.numeric(as.character(ServiceLevel$'Target %'))/100
+ServiceLevel$SL <- as.numeric(as.character(ServiceLevel$'% Within Service Level'))/100
+
+
+SM41 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 41 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Monitoring")
+SM52 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 52 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Billing")
+SM53 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 53 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Service Dispatch Customer")
+SM54 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 54 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Service Dispatch Tech")
+SM55 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 55 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "3G Projects")
+SM61 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 61 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Field Support Customer")
+SM62 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 62 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Field Support Tech")
+SM63 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 63 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Fire Admin Customer")
+SM64 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 64 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Fire Admin Tech")
+SM71 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 71 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Tech Support Customer")
+SM72 <- read_csv("C:/Users/Zach/Desktop/Bay Files/Summary/Summary Daily 72 (-31--1).csv", skip = 3) %>%
+  filter(! str_detect(Date, "Totals")) %>%
+  mutate('Department' = "Tech Support Tech")
+
+Summary <- bind_rows(SM41,SM52,SM53,SM54,SM55,SM61,SM62,SM63,SM64,SM71,SM72)
+Summary$'Total Calls' <- Summary$'ACD Calls' + Summary$'Extn Out Calls'
+
+SLSummary <- bind_cols(ServiceLevel, Summary)
+
+#Clean Global Environment
+rm(SL41,SL52,SL53,SL54,SL55,SL61,SL62,SL63,SL64,SL71,SL72,SM41,SM52,SM53,SM54,SM55,SM61,SM62,SM63,SM64,SM71,SM72)
+
+#Test Matching Dates
+if((SLSummary$'Date...1' %in% SLSummary$'Date...16') = TRUE){
+  SLSummary$Date...16 <- NULL
+}else{print("ERROR ON MATCHING DATES")}
+
+#Test Matching Departments
+if((SLSummary$'Department...13' %in% SLSummary$'Department...32')= TRUE){
+  SLSummary$Department...32 <- NULL
+}else{print("ERROR ON MATCHING DEPARTMENTS")}
+
+##Prepare to Combine CleanedDF and SLSummary####
+
+#Match Date Format
+SLSummary$DateSLS <- as.Date.character(SLSummary$Date...1, format = '%m/%d/%Y')
+SLSummary$DepartmentSLS <- SLSummary$Department...13
+
+
+SLSummary <- SLSummary %>%
+  arrange(DepartmentSLS,DateSLS)
+
+CleanedDF <- CleanedDF %>%
+  arrange(Department, Date)
+
+
+CleanedDF <- bind_cols(CleanedDF,SLSummary)
+
+
+CSBreakdown <- CleanedDF[,1]
+CSBreakdown$Department <- CSBreakdown$Department...1
+CSBreakdown$Date <- CleanedDF$Date...2
+CSBreakdown$StaffedHours <- CleanedDF$'Staffed Hours'
+CSBreakdown$AvailableHours <- CleanedDF$'Available Hours'
+CSBreakdown$AUXHours <- CleanedDF$'AUX Hours'
+CSBreakdown$OtherHours <- CleanedDF$'Other Hours'
+CSBreakdown$TargetSL <- CleanedDF$'Target %'
+CSBreakdown$WithinServiceLevel <- CleanedDF$'% Within Service Level'
+CSBreakdown$SLGoal <- CleanedDF$SLGoal
+CSBreakdown$SL <- CleanedDF$SL
+CSBreakdown$TotalCalls <- CleanedDF$'Total Calls'
+CSBreakdown$ASA <- CleanedDF$'Avg Speed Ans...19'
+CSBreakdown$AvgACDTime <- CleanedDF$'Avg ACD Time (Minutes)'
+CSBreakdown$Department...1 <- NULL
+
+## Write final copy to CSV ####
+write.table(CSBreakdown, file="May Report Daily.csv", sep=",", row.names=FALSE)
+
+
+#Plot Metrics####
+
+#Plot Call Volume into 3 readable PDFs
+  #PDF 1
+ggplot(CSBreakdown, aes(Date, TotalCalls)) + 
+  geom_col(fill = "#9ADDF7", color = "#0985B4") + 
+  facet_wrap_paginate(~Department, scales = "free_y", nrow = 2, ncol = 2, page = 1) +
+  theme_classic()
+ggsave("CallVolumeOutputs1.pdf", device = "pdf", path = "C:/Users/Zach/Desktop", scale = 1.5 )
+
+  #PDF 2
+ggplot(CSBreakdown, aes(Date, TotalCalls)) + 
+  geom_col(fill = "#9ADDF7", color = "#0985B4") + 
+  facet_wrap_paginate(~Department, scales = "free_y", nrow =2, ncol = 2, page = 2) +
+  theme_classic()
+ggsave("CallVolumeOutputs2.pdf", device = "pdf", path = "C:/Users/Zach/Desktop", scale = 1.5 )
+
+  #PDF 3
+ggplot(CSBreakdown, aes(Date, TotalCalls)) + 
+  geom_col(fill = "#9ADDF7", color = "#0985B4") + 
+  facet_wrap_paginate(~Department, scales = "free_y", nrow =2, ncol = 2, page = 3) +
+  theme_classic()
+ggsave("CallVolumeOutputs3.pdf", device = "pdf", path = "C:/Users/Zach/Desktop", scale = 1.5 )
+
+
+#Plot Service Level and export it as 3 PDFs
+  #PDF1
+ggplot(CSBreakdown, aes(Date,SL)) + 
+    geom_line(color = "#800020", size = .8, stat = "summary", fun = "mean", ) +
+    geom_line(aes(Date,SLGoal), size = 1.5) +
+    scale_y_continuous(labels = scales::percent) +
+    xlab("Date") + ylab("Service Level") +
+    theme_classic() +
+    facet_wrap_paginate(~Department, nrow = 2, ncol = 2, page = 1)
+ggsave("ServiceLevelOutputs1.pdf",  device = "pdf", path = "C:/Users/Zach/Desktop/", scale = 2 )
+
+  #PDF2
+ggplot(CSBreakdown, aes(Date,SL)) + 
+    geom_line(color = "#800020", size = .8, stat = "summary", fun = "mean", ) +
+    geom_line(aes(Date,SLGoal), size = 1.5) +
+    scale_y_continuous(labels = scales::percent) +
+    xlab("Date") + ylab("Service Level") +
+    theme_classic() +
+    facet_wrap_paginate(~Department, nrow = 2, ncol = 2, page = 2)
+ggsave("ServiceLevelOutputs2.pdf",  device = "pdf", path = "C:/Users/Zach/Desktop/", scale = 2 )
+
+  #PDF3
+ggplot(CSBreakdown, aes(Date,SL)) + 
+  geom_line(color = "#800020", size = .8, stat = "summary", fun = "mean", ) +
+  geom_line(aes(Date,SLGoal), size = 1.5) +
+  scale_y_continuous(labels = scales::percent) +
+  xlab("Date") + ylab("Service Level") +
+  theme_classic() +
+  facet_wrap_paginate(~Department, nrow = 2, ncol = 2, page = 3)
+ggsave("ServiceLevelOutputs3.pdf",  device = "pdf", path = "C:/Users/Zach/Desktop/", scale = 2 )
+
+
+  
+#Plot ASA
+
+
+
+
+
+
+
+
